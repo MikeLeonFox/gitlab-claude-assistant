@@ -1,0 +1,9 @@
+{
+  "name": "gitlab-workflow",
+  "version": "1.0.0",
+  "description": "GitLab workflow automation via glab CLI — comment on issues, move/update issues, reference them in commits, create merge requests, and close issues automatically.",
+  "author": {
+    "name": "mike.fox"
+  },
+  "keywords": ["gitlab", "glab", "issues", "merge-requests", "workflow", "commits"]
+}

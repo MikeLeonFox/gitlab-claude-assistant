@@ -1,93 +1,230 @@
-# Claude Code Gitlab Skill
+# GitLab Workflow — Claude Code Plugin
 
+Automate your GitLab project management from inside Claude Code. Comment on issues, transition their state, reference them in commits, and open merge requests — using plain language or slash commands.
 
+Comments post under your own GitLab account, written in your voice. Claude never announces itself.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Requirements
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- [Claude Code](https://claude.ai/code) installed
+- [`glab`](https://gitlab.com/gitlab-org/cli) CLI installed and authenticated
 
-## Add your files
+```bash
+# macOS
+brew install glab
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+# Linux
+curl -sL https://github.com/cli/cli/releases/latest | ... # see glab docs
 
+# Authenticate
+glab auth login
 ```
-cd existing_repo
-git remote add origin https://gitlab.maibornwolff.de/department-ti/azubis/mike/claude-code-gitlab-skill.git
-git branch -M main
-git push -uf origin main
+
+Verify it works:
+
+```bash
+glab auth status
+# Should show: Logged in to gitlab.example.com as yourname
 ```
 
-## Integrate with your tools
-
-* [Set up project integrations](https://gitlab.maibornwolff.de/department-ti/azubis/mike/claude-code-gitlab-skill/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### From a git URL (recommended)
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+claude plugin add git:https://gitlab.example.com/your-group/claude-code-gitlab-skill.git
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### Local install (for development or testing)
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+claude --plugin-dir /path/to/claude-code-gitlab-skill
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+After installing, enable the plugin in Claude Code settings if it isn't automatically enabled.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+---
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Quick Start
+
+Once installed, just talk to Claude. The skill activates automatically:
+
+```
+"Comment on issue #42 that I'm starting work on this"
+"Move issue 12 to in-progress and assign it to me"
+"Create a commit that closes issue 55"
+"Open a merge request for issue 42"
+"I'm blocked on issue 88, add a note saying I'm waiting for design sign-off"
+```
+
+Or use the slash commands for explicit, step-by-step control.
+
+---
+
+## Slash Commands
+
+### `/gitlab-issue <id-or-url> [action]`
+
+Manage a GitLab issue end-to-end.
+
+**Actions:**
+
+| Action | What happens |
+|--------|-------------|
+| `view` | Show issue details and comments *(default)* |
+| `comment` | Post a comment as you |
+| `start` | Assign to you, label as in-progress, post a start comment, create a branch |
+| `finish` | Commit, push, open MR, transition to review, post a comment |
+| `move` | Transition the issue to a different label/state |
+
+**Examples:**
+
+```
+/gitlab-issue 42
+/gitlab-issue 42 start
+/gitlab-issue 42 comment
+/gitlab-issue 42 finish
+/gitlab-issue 42 move
+
+# Full URL works too — project is parsed automatically
+/gitlab-issue https://gitlab.example.com/group/project/-/issues/42 start
+```
+
+---
+
+### `/gitlab-commit <id-or-url> [closes|relates]`
+
+Create a properly formatted conventional commit that references a GitLab issue.
+
+```
+/gitlab-commit 42             # Closes #42 (default)
+/gitlab-commit 42 relates     # Related to #42 (no auto-close)
+/gitlab-commit https://gitlab.example.com/group/project/-/issues/42
+```
+
+Claude will:
+1. Check what's staged
+2. Ask for commit type and description if needed
+3. Write the commit message in conventional format
+4. Offer to push and open an MR
+
+---
+
+## Cross-Project Issues
+
+Your issues often live in a different GitLab project than the code you're working in. The plugin resolves the right project automatically:
+
+| Priority | Source | How to use |
+|----------|--------|------------|
+| 1 | URL passed directly | Paste any GitLab URL when Claude asks |
+| 2 | `GITLAB_ISSUE_PROJECT` env var | `export GITLAB_ISSUE_PROJECT=https://.../-/boards` |
+| 3 | `.gitlab-workflow` config file | Paste your board URL in a file at your repo root |
+| 4 | Git remote `origin` | Automatic when working in the issue project itself |
+| 5 | Prompt | Claude asks once and offers to save your answer |
+
+### Setting up `.gitlab-workflow`
+
+Open your GitLab issue board, copy the URL from the browser, and paste it into the file:
+
+```bash
+echo "https://gitlab.example.com/group/project/-/boards" > .gitlab-workflow
+echo ".gitlab-workflow" >> .gitignore
+```
+
+Any URL from the project works — board, issue list, a specific issue, the project root. The plugin extracts the project path automatically. The file is discovered by walking up the directory tree, so one file at a monorepo root covers all sub-projects within it.
+
+---
+
+## How Comments Work
+
+Comments are posted via `glab` under your authenticated GitLab account — they appear as **you**, not as Claude.
+
+Claude writes comments in first person in your voice and confirms the wording with you before posting. It will never add "Claude:", "AI:", or any indication that the comment was generated.
+
+```
+You say:    "comment that I'm blocked waiting for the API spec"
+Posted as:  "Blocked — waiting for the API spec to be finalised."
+
+You say:    "say the fix is in MR !23"
+Posted as:  "Fix is up in !23 for review."
+```
+
+---
+
+## Commit Format
+
+The plugin uses [Conventional Commits](https://www.conventionalcommits.org/) with GitLab auto-close keywords:
+
+```
+feat(auth): add password reset flow
+
+Closes #42
+```
+
+**Types:** `feat` `fix` `docs` `style` `refactor` `perf` `test` `chore` `ci`
+
+**Auto-close keywords** *(take effect when the MR merges to the default branch):*
+`Closes` `Fixes` `Resolves` `Implements`
+
+**Reference without closing:**
+`Related to` `Part of` `See`
+
+**Cross-project reference:**
+```
+Closes group/project#42
+```
+
+---
+
+## Plugin Structure
+
+```
+claude-code-gitlab-skill/
+├── .claude-plugin/
+│   └── plugin.json                              # Plugin manifest
+├── skills/
+│   └── gitlab-workflow/
+│       ├── SKILL.md                             # Auto-activating skill
+│       ├── scripts/
+│       │   └── resolve-project.sh              # Project path resolution logic
+│       └── references/
+│           ├── glab-commands.md                # Full glab flag reference
+│           ├── commit-conventions.md           # Commit format + GitLab keywords
+│           └── config-guide.md                 # .gitlab-workflow config docs
+└── commands/
+    ├── gitlab-issue.md                          # /gitlab-issue slash command
+    └── gitlab-commit.md                         # /gitlab-commit slash command
+```
+
+The skill auto-activates based on context — no slash command needed for everyday use. The slash commands give you explicit, structured control when you want it.
+
+---
+
+## Troubleshooting
+
+**`glab: command not found`**
+Install glab: `brew install glab` (macOS) or see [glab installation docs](https://gitlab.com/gitlab-org/cli#installation).
+
+**Comments posting as the wrong user**
+Run `glab auth status` to check which account is active. Switch with `glab auth login`.
+
+**Wrong project being targeted**
+Paste the full issue URL, or create a `.gitlab-workflow` file with `issue_project=group/project`.
+
+**`ERROR: 404 Not Found`**
+Check that your glab token has access to the target project. Verify the project path with `glab repo view -R group/project`.
+
+**`glab auth login` for a self-hosted GitLab instance**
+```bash
+glab auth login --hostname gitlab.yourcompany.com
+```
+
+---
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT

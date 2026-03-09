@@ -1,0 +1,244 @@
+---
+name: gitlab-workflow
+description: This skill should be used when the user asks to "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", or mentions GitLab issue numbers (e.g. "#42", "issue 42"). Automates GitLab project management workflows using the glab CLI.
+version: 1.0.0
+---
+
+# GitLab Workflow Automation
+
+Automates GitLab project management using the `glab` CLI: commenting on issues, moving/updating issues, referencing issues in commits, and managing merge requests.
+
+## Critical Rules
+
+### Rule 1: Always Comment as the User — Never as Claude
+
+Comments posted via `glab` appear under the authenticated GitLab account (the user's own account). Never break this illusion:
+
+- Write comments in **first person** from the user's perspective
+- Never prefix comments with "Claude:", "AI:", "Note from AI:", or anything that signals automation
+- Mirror the user's tone — casual if they're casual, technical if they're technical
+- When the user says "comment saying I'm starting work", write: `"Starting work on this."` — not `"The user is starting work on this."`
+- When unsure of the exact wording, ask the user to confirm before posting
+
+**Examples:**
+
+| User says | Comment to post |
+|---|---|
+| "comment that I'm starting work on this" | `"Starting work on this."` |
+| "say I'm blocked waiting for design assets" | `"Blocked — waiting for design assets from the design team."` |
+| "comment that the fix is in MR !23" | `"Fix is up in !23 for review."` |
+| "tell them I need more info on the acceptance criteria" | `"Could you clarify the acceptance criteria for this? Specifically [...]"` |
+
+Always confirm the comment text with the user before posting if the wording isn't explicit.
+
+### Rule 2: Verify Auth Identity Before First Comment
+
+Before posting any comment in a session, check who glab is authenticated as:
+
+```bash
+glab auth status
+```
+
+Confirm the username matches who the user expects. If not, prompt them to re-authenticate:
+```bash
+glab auth login
+```
+
+---
+
+## Resolving the Right GitLab Project
+
+Issues are often in a **different project** than the current working directory. Always resolve the correct project before running any `glab issue` command.
+
+### Resolution Order (use the first that works)
+
+**Step 1 — Did the user provide a full URL?**
+
+If the user pastes a URL like `https://gitlab.example.com/group/subgroup/project/-/issues/42`, parse it:
+- Project path: everything between the host and `/-/` → `group/subgroup/project`
+- Issue ID: the number after `/issues/` → `42`
+
+Then run:
+```bash
+glab issue note 42 -R group/subgroup/project -m "comment"
+```
+
+**Step 2 — Use the resolve script:**
+```bash
+PROJECT=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/gitlab-workflow/scripts/resolve-project.sh)
+```
+
+The script checks (in order):
+1. `GITLAB_ISSUE_PROJECT` environment variable
+2. `.gitlab-workflow` config file (walks up from CWD)
+3. Current git remote `origin` (if it's a GitLab remote)
+
+**Step 3 — Ask the user**
+
+If no project can be resolved, ask once:
+> "Which GitLab project are these issues in? (e.g. `group/project` or paste a full issue URL)"
+
+Then offer to save it so they don't have to answer again:
+```bash
+echo "issue_project=group/project" > .gitlab-workflow
+echo ".gitlab-workflow" >> .gitignore  # keep it local
+```
+
+### Config File: `.gitlab-workflow`
+
+Paste any GitLab URL from the issue project — the board URL is the most convenient. Place the file at the repo root (or any parent directory).
+
+```bash
+echo "https://gitlab.example.com/group/project/-/boards" > .gitlab-workflow
+echo ".gitlab-workflow" >> .gitignore
+```
+
+Any URL from the project works: board, issue list, a specific issue, MR, the project root. The plugin extracts the project path automatically.
+
+### Using -R Flag
+
+All `glab issue` and `glab mr` commands accept `-R`:
+```bash
+glab issue note 42 -R group/project -m "comment"
+glab issue update 42 -R group/project --label "in-progress"
+glab issue view 42 -R group/project
+```
+
+For deeply nested groups:
+```bash
+glab issue note 42 -R department/team/subteam/project -m "comment"
+```
+
+---
+
+## Core Workflows
+
+### 1. Comment on an Issue
+
+Resolve the project first, then:
+
+```bash
+glab issue note <issue-id> -R <project> -m "Starting work on this."
+```
+
+Always write the comment text in first person as the user. Confirm wording before posting.
+
+### 2. Move / Update an Issue
+
+"Moving" means transitioning workflow state via labels, assignee, or milestone.
+
+```bash
+# Label transition (e.g. to-do → in-progress)
+glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do"
+
+# Assign to self (get username from: glab auth status)
+glab issue update <id> -R <project> --assignee <username>
+
+# Set milestone
+glab issue update <id> -R <project> --milestone "Sprint 3"
+
+# Combine multiple updates
+glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do" --assignee <username>
+```
+
+Close or reopen:
+```bash
+glab issue close <id> -R <project>
+glab issue reopen <id> -R <project>
+```
+
+### 3. Reference Issues in Commits
+
+Always reference issues in commit messages. The issue and commit repo can be different — the reference still shows up as a cross-project link in GitLab.
+
+**Auto-close on merge (use these keywords):**
+```
+Closes #42
+Fixes #42
+Resolves #42
+```
+
+**Reference only (no auto-close):**
+```
+Related to #42
+Part of #42
+```
+
+**For cross-project references:**
+```
+Closes group/project#42
+```
+
+**Full commit format:**
+```
+feat(scope): short description
+
+Closes #42
+```
+
+See `references/commit-conventions.md` for full format guide.
+
+### 4. Start Working on an Issue
+
+When the user says "start working on issue #42" or "pick up issue 42":
+
+1. Resolve the project path
+2. View the issue:
+   ```bash
+   glab issue view <id> -R <project>
+   ```
+3. Update state:
+   ```bash
+   glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do" --assignee <username>
+   ```
+4. Post a start comment (first person, confirm wording):
+   ```bash
+   glab issue note <id> -R <project> -m "Starting work on this."
+   ```
+5. Create a branch in the code repo:
+   ```bash
+   git checkout -b feat/issue-<id>-short-description
+   ```
+
+### 5. Finish an Issue / Open MR
+
+When the user says "finish issue #42" or "open MR for issue 42":
+
+1. Commit with closing reference:
+   ```bash
+   git commit -m "feat: description
+
+   Closes #<id>"
+   ```
+2. Push:
+   ```bash
+   git push -u origin <branch>
+   ```
+3. Create MR:
+   ```bash
+   glab mr create --fill --target-branch main
+   ```
+4. Update issue labels:
+   ```bash
+   glab issue update <id> -R <project> --label "review" --unlabel "in-progress"
+   ```
+5. Comment with MR reference (first person):
+   ```bash
+   glab issue note <id> -R <project> -m "MR up for review: !<mr-number>"
+   ```
+
+### 6. List Issues
+
+```bash
+glab issue list -R <project>
+glab issue list -R <project> --label "in-progress"
+glab issue list -R <project> --assignee @me
+```
+
+---
+
+## Additional Resources
+
+- **`references/glab-commands.md`** — Full glab flag reference for issue and MR commands
+- **`references/commit-conventions.md`** — Conventional commit format and GitLab auto-close keywords
+- **`scripts/resolve-project.sh`** — Script to resolve the correct GitLab project path
