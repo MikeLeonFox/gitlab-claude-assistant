@@ -75,6 +75,44 @@ export GITLAB_HOST=gitlab.example.org  # for self-hosted
 
 ---
 
+## Resolving the GitLab Hostname
+
+Before using `glab api`, you must know the GitLab hostname. Default is `gitlab.com`, but for self-hosted instances this will be wrong. Always resolve it — **never assume `gitlab.com`**.
+
+**Resolution order:**
+
+1. `.gitlab-workflow.json` — extract hostname from `url` field
+2. `GITLAB_HOST` environment variable
+3. Git remote `origin` — only if hostname is NOT `github.com` or `bitbucket.org`
+4. `glab auth status` — find the logged-in non-`gitlab.com` host
+5. Fall back to `gitlab.com`
+
+**Detection script:**
+```bash
+GITLAB_HOST=$(
+  # 1. .gitlab-workflow.json
+  root=$(git rev-parse --show-toplevel 2>/dev/null) && \
+  h=$(jq -r '.url // empty' "$root/.gitlab-workflow.json" 2>/dev/null | sed -E 's|https?://([^/]+)/.*|\1|' | grep -v '^$') && \
+  [[ -n "$h" ]] && echo "$h" && exit
+  # 2. GITLAB_HOST env var
+  [[ -n "${GITLAB_HOST:-}" ]] && echo "$GITLAB_HOST" && exit
+  # 3. Git remote (skip github/bitbucket)
+  remote=$(git remote get-url origin 2>/dev/null) && \
+  h=$(echo "$remote" | sed -E 's|https?://([^/]+)/.*|\1|; s|git@([^:]+):.*|\1|') && \
+  echo "$h" | grep -Eqv 'github\.com|bitbucket\.org' && echo "$h" && exit
+  # 4. glab auth status — first logged-in non-gitlab.com host
+  glab auth status 2>&1 | grep -E 'Logged in to' | grep -v 'gitlab\.com' | sed -E 's/.*Logged in to ([^ ]+).*/\1/' | head -1 && exit
+  echo "gitlab.com"
+) 2>/dev/null
+```
+
+Always pass `--hostname "$GITLAB_HOST"` to all `glab api` calls:
+```bash
+glab api --hostname "$GITLAB_HOST" "issues?scope=assigned_to_me"
+```
+
+---
+
 ## Resolving the Right GitLab Project
 
 Issues are often in a **different project** than the current working directory. Always resolve the correct project before running any `glab issue` command.
@@ -268,6 +306,20 @@ When the user says "finish issue #42" or "open MR for issue 42":
 glab issue list -R <project>
 glab issue list -R <project> --label "in-progress"
 glab issue list -R <project> --assignee @me
+```
+
+**Listing all issues assigned to you (across all projects):**
+
+`glab issue list --assignee @me` is repo-scoped and returns nothing if the current repo has no issues. For a global search across all projects, resolve the hostname first (see **Resolving the GitLab Hostname** above), then use the API:
+
+```bash
+# After resolving GITLAB_HOST...
+glab api --hostname "$GITLAB_HOST" "issues?scope=assigned_to_me&state=opened" | jq -r '.[] | "[\(.labels | map(select(startswith("status::"))) | first // "no status")] \(.references.full) — \(.title)"'
+```
+
+To also show closed issues:
+```bash
+glab api --hostname "$GITLAB_HOST" "issues?scope=assigned_to_me&state=all" | jq -r '.[] | "[\(.state)] \(.references.full) — \(.title)"'
 ```
 
 ### 7. Reviewing Merge Requests
