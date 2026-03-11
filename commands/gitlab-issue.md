@@ -27,7 +27,7 @@ If a full URL is provided, parse it to extract:
 If the project was not in a URL, resolve it:
 
 ```bash
-PROJECT=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/gitlab-workflow/scripts/resolve-project.sh)
+PROJECT=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-project.sh)
 ```
 
 If the script exits with an error (no project found), ask the user:
@@ -35,8 +35,8 @@ If the script exits with an error (no project found), ask the user:
 
 Offer to save the answer to `.gitlab-workflow` so it's remembered:
 ```bash
-echo "issue_project=<group/project>" > .gitlab-workflow
-echo ".gitlab-workflow" >> .gitignore
+echo '{ "url": "https://gitlab.example.com/<group/project>/-/boards" }' > .gitlab-workflow.json
+echo ".gitlab-workflow.json" >> .gitignore
 ```
 
 ### Step 3: Verify auth identity (first run in session)

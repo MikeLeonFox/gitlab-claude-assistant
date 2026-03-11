@@ -25,7 +25,7 @@ If a full URL is provided, extract:
 If the issue is in a **different** repo than the current git project, use the full cross-project syntax in the commit footer instead of just `#42`:
 
 ```bash
-PROJECT=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/gitlab-workflow/scripts/resolve-project.sh)
+PROJECT=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-project.sh)
 ```
 
 Check if `$PROJECT` matches the current repo's remote:

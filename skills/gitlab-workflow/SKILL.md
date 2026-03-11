@@ -94,7 +94,7 @@ glab issue note 42 -R group/subgroup/project -m "comment"
 
 **Step 2 — Use the resolve script:**
 ```bash
-PROJECT=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/gitlab-workflow/scripts/resolve-project.sh)
+PROJECT=$(bash ${CLAUDE_SKILL_DIR}/scripts/resolve-project.sh)
 ```
 
 The script checks (in order):

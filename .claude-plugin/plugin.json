@@ -1,9 +1,12 @@
 {
   "name": "gitlab-workflow",
-  "version": "1.0.0",
-  "description": "GitLab workflow automation via glab CLI — comment on issues, move/update issues, reference them in commits, create merge requests, and close issues automatically.",
+  "version": "2.0.0",
+  "description": "Automates GitLab issue management, merge requests, CI/CD monitoring, and commit workflows using the glab CLI.",
   "author": {
     "name": "mike.fox"
   },
-  "keywords": ["gitlab", "glab", "issues", "merge-requests", "workflow", "commits"]
+  "homepage": "https://github.com/MikeLeonFox/gitlab-claude-assistant",
+  "repository": "https://github.com/MikeLeonFox/gitlab-claude-assistant",
+  "license": "MIT",
+  "keywords": ["gitlab", "glab", "issues", "merge-requests", "ci-cd", "workflow"]
 }
