@@ -1,230 +1,315 @@
-# GitLab Workflow — Claude Code Plugin
+## 1. Project Overview
 
-Automate your GitLab project management from inside Claude Code. Comment on issues, transition their state, reference them in commits, and open merge requests — using plain language or slash commands.
-
-Comments post under your own GitLab account, written in your voice. Claude never announces itself.
-
----
-
-## Requirements
-
-- [Claude Code](https://claude.ai/code) installed
-- [`glab`](https://gitlab.com/gitlab-org/cli) CLI installed and authenticated
-
-```bash
-# macOS
-brew install glab
-
-# Linux
-curl -sL https://github.com/cli/cli/releases/latest | ... # see glab docs
-
-# Authenticate
-glab auth login
-```
-
-Verify it works:
-
-```bash
-glab auth status
-# Should show: Logged in to gitlab.example.com as yourname
-```
+| Item                      | Value                                                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Project name**          | `gitlab-claude-assistant`                                                                                                              |
+| **Primary goal**          | Automate issue management, commit‑to‑issue linking, pipeline configuration, and code‑review tasks in a GitLab repository using Claude. |
+| **Core personas**         | Developers, Product Owners, QA Engineers, Ops Engineers                                                                                |
+| **Deployment**            | CLI + optional Web UI; Dockerised CI helper that runs in GitLab CI.                                                                    |
+| **Target GitLab version** | 15.x+ (REST v4 + GraphQL)                                                                                                              |
 
 ---
 
-## Installation
-
-### From a git URL (recommended)
-
-```bash
-claude plugin add git:https://gitlab.example.com/your-group/claude-code-gitlab-skill.git
-```
-
-### Local install (for development or testing)
-
-```bash
-claude --plugin-dir /path/to/claude-code-gitlab-skill
-```
-
-After installing, enable the plugin in Claude Code settings if it isn't automatically enabled.
-
----
-
-## Quick Start
-
-Once installed, just talk to Claude. The skill activates automatically:
+## 2. Repository Skeleton
 
 ```
-"Comment on issue #42 that I'm starting work on this"
-"Move issue 12 to in-progress and assign it to me"
-"Create a commit that closes issue 55"
-"Open a merge request for issue 42"
-"I'm blocked on issue 88, add a note saying I'm waiting for design sign-off"
-```
-
-Or use the slash commands for explicit, step-by-step control.
-
----
-
-## Slash Commands
-
-### `/gitlab-issue <id-or-url> [action]`
-
-Manage a GitLab issue end-to-end.
-
-**Actions:**
-
-| Action | What happens |
-|--------|-------------|
-| `view` | Show issue details and comments *(default)* |
-| `comment` | Post a comment as you |
-| `start` | Assign to you, label as in-progress, post a start comment, create a branch |
-| `finish` | Commit, push, open MR, transition to review, post a comment |
-| `move` | Transition the issue to a different label/state |
-
-**Examples:**
-
-```
-/gitlab-issue 42
-/gitlab-issue 42 start
-/gitlab-issue 42 comment
-/gitlab-issue 42 finish
-/gitlab-issue 42 move
-
-# Full URL works too — project is parsed automatically
-/gitlab-issue https://gitlab.example.com/group/project/-/issues/42 start
+gitlab-claude-assistant/
+├── .claude.yaml          # Config template (see Section 6)
+├── README.md             # This file
+├── cli/
+│   ├── __init__.py
+│   ├── main.py           # Click / Typer entry point
+│   └── prompts/
+│       ├── issue_create.md
+│       ├── commit_link.md
+│       ├── weight_estimate.md
+│       └── test_generation.md
+├── ci/
+│   ├── Dockerfile
+│   ├── claude_ci.sh
+│   └── requirements.txt
+├── tests/
+│   ├── test_cli.py
+│   └── test_ci.py
+└── .gitlab-ci.yml
 ```
 
 ---
 
-### `/gitlab-commit <id-or-url> [closes|relates]`
+## 3. High‑Level Architecture
 
-Create a properly formatted conventional commit that references a GitLab issue.
-
+```mermaid
+graph TD
+    A[User (CLI/Web UI)] -->|Command| B[Claude Wrapper]
+    B -->|Prompt| C[Claude LLM]
+    C -->|Response| B
+    B -->|GitLab Ops| D[GitLab API]
+    D -->|CRUD| E[Repository State]
+    B -->|CI Job| F[Dockerised CI Helper]
+    F -->|Lint / Tests / Docs| G[GitLab Runner]
 ```
-/gitlab-commit 42             # Closes #42 (default)
-/gitlab-commit 42 relates     # Related to #42 (no auto-close)
-/gitlab-commit https://gitlab.example.com/group/project/-/issues/42
-```
 
-Claude will:
-1. Check what's staged
-2. Ask for commit type and description if needed
-3. Write the commit message in conventional format
-4. Offer to push and open an MR
+- **Claude Wrapper** – Handles prompt construction, token usage, caching, and error handling.
+- **GitLab API** – Uses `python-gitlab` SDK or equivalent; all CRUD ops are batched where possible.
+- **CI Helper** – A Docker image that runs as a job in the pipeline; contains the same CLI for local testing.
 
 ---
 
-## Cross-Project Issues
+## 4. Feature Set (Detailed)
 
-Your issues often live in a different GitLab project than the code you're working in. The plugin resolves the right project automatically:
-
-| Priority | Source | How to use |
-|----------|--------|------------|
-| 1 | URL passed directly | Paste any GitLab URL when Claude asks |
-| 2 | `GITLAB_ISSUE_PROJECT` env var | `export GITLAB_ISSUE_PROJECT=https://.../-/boards` |
-| 3 | `.gitlab-workflow` config file | Paste your board URL in a file at your repo root |
-| 4 | Git remote `origin` | Automatic when working in the issue project itself |
-| 5 | Prompt | Claude asks once and offers to save your answer |
-
-### Setting up `.gitlab-workflow`
-
-Open your GitLab issue board, copy the URL from the browser, and paste it into the file:
-
-```bash
-echo "https://gitlab.example.com/group/project/-/boards" > .gitlab-workflow
-echo ".gitlab-workflow" >> .gitignore
-```
-
-Any URL from the project works — board, issue list, a specific issue, the project root. The plugin extracts the project path automatically. The file is discovered by walking up the directory tree, so one file at a monorepo root covers all sub-projects within it.
+| Feature                     | Command                      | Prompt File                  | Notes                                                                        |
+| --------------------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
+| **Auto‑config & Init**      | `claude init`                | –                            | Generates `.claude.yaml`, sets up GitLab hooks, creates default board.       |
+| **Issue Creation**          | `claude create`              | `prompts/issue_create.md`    | Conversational dialog: title → body → labels → assignee → weight.            |
+| **Commit‑to‑Issue Linking** | `claude link-commit <sha>`   | `prompts/commit_link.md`     | Detects issue refs or creates a draft issue.                                 |
+| **Weight Estimation**       | `claude estimate <issue-id>` | `prompts/weight_estimate.md` | Returns numeric estimate + confidence.                                       |
+| **Test Generation**         | `claude test <file_path>`    | `prompts/test_generation.md` | Generates unit test stubs for the target function.                           |
+| **Board Sync**              | `claude board`               | –                            | Auto‑creates/updates a GitLab board with lists Backlog → In‑Progress → Done. |
+| **Merge‑Request Helper**    | `claude mr`                  | –                            | Creates branch + MR, auto‑assigns reviewers based on code‑owners.            |
+| **Auto‑Merge**              | `claude merge`               | –                            | Runs after pipeline success + `Ready` label; auto‑merges.                    |
+| **Analytics**               | `claude analytics`           | –                            | Outputs velocity, cycle time, issue churn.                                   |
+| **Chat‑The‑Repo**           | `claude chat`                | –                            | Open‑ended Q&A about the repo (e.g., “What are the biggest blockers?”).      |
 
 ---
 
-## How Comments Work
+## 5. Prompt Templates
 
-Comments are posted via `glab` under your authenticated GitLab account — they appear as **you**, not as Claude.
+> **Tip** – Keep each prompt in its own `.md` file. Use placeholders like `{project_name}` that the CLI fills in at runtime.
 
-Claude writes comments in first person in your voice and confirms the wording with you before posting. It will never add "Claude:", "AI:", or any indication that the comment was generated.
+### 5.1 `prompts/issue_create.md`
 
 ```
-You say:    "comment that I'm blocked waiting for the API spec"
-Posted as:  "Blocked — waiting for the API spec to be finalised."
+You are a project manager for the GitLab project "{project_name}".
+A developer wants to add a new feature or bug fix: "{user_input}".
 
-You say:    "say the fix is in MR !23"
-Posted as:  "Fix is up in !23 for review."
+Generate a complete issue:
+- Title (max 80 chars)
+- Body (include acceptance criteria, steps to reproduce if bug)
+- Labels (choose from: enhancement, bug, documentation, ui, backend)
+- Assignee (default: {default_assignee})
+- Weight (estimate in hours, with a confidence score 0‑1)
+
+Respond in JSON with keys: title, body, labels, assignee, weight, confidence.
 ```
+
+### 5.2 `prompts/commit_link.md`
+
+```
+A new commit has been pushed: "{commit_message}" (SHA: {sha}).
+Determine the best matching open issue(s) by title or description.
+If a match is found, return the issue ID and a concise linking comment.
+If no match, propose a new issue title.
+
+Output JSON: { "issue_id": <int>, "comment": "<string>" } or { "suggestion_title": "<string>" }.
+```
+
+### 5.3 `prompts/weight_estimate.md`
+
+```
+Analyze the issue body (provided below) and estimate the effort in hours.
+Consider typical task complexity for the repository language and domain.
+
+Provide:
+- Estimated hours (float)
+- Confidence score (0‑1)
+- Rationale (short, < 50 words)
+
+Output JSON: { "hours": <float>, "confidence": <float>, "rationale": "<string>" }.
+```
+
+### 5.4 `prompts/test_generation.md`
+
+````
+You are a senior QA engineer. Generate unit tests for the function below in {repo_language}.
+
+File: {file_path}
+Function signature: {function_signature}
+
+Output the tests as a single Markdown code block (```) in the target language.
+Ensure tests cover edge cases and normal flows.
+````
 
 ---
 
-## Commit Format
+## 6. Configuration (`.claude.yaml`)
 
-The plugin uses [Conventional Commits](https://www.conventionalcommits.org/) with GitLab auto-close keywords:
+```yaml
+# .claude.yaml – Configuration for gitlab-claude-assistant
 
+project_name: MyApp
+board_name: "Development Board"
+default_assignee: "@alice"
+weight_scale: "hours"
+llm:
+  provider: "anthropic"
+  model: "claude-3.5-sonnet"
+  max_retries: 3
+  temperature: 0.2
+gitlab:
+  api_url: "https://gitlab.com/api/v4"
+  auth_token_env: "GITLAB_TOKEN" # Should be set as CI variable
+ci:
+  docker_image: "gitlab-claude-assistant:latest"
+  lint_tool: "ruff" # or any other linter
+  test_tool: "pytest"
+  doc_tool: "mkdocs"
 ```
-feat(auth): add password reset flow
 
-Closes #42
-```
-
-**Types:** `feat` `fix` `docs` `style` `refactor` `perf` `test` `chore` `ci`
-
-**Auto-close keywords** *(take effect when the MR merges to the default branch):*
-`Closes` `Fixes` `Resolves` `Implements`
-
-**Reference without closing:**
-`Related to` `Part of` `See`
-
-**Cross-project reference:**
-```
-Closes group/project#42
-```
+- **`auth_token_env`** – The name of the environment variable that contains the personal access token.
+- **`ci.docker_image`** – The tag of the Docker image to run in the CI pipeline.
 
 ---
 
-## Plugin Structure
+## 7. GitLab CI Configuration (`.gitlab-ci.yml`)
 
-```
-claude-code-gitlab-skill/
-├── .claude-plugin/
-│   └── plugin.json                              # Plugin manifest
-├── skills/
-│   └── gitlab-workflow/
-│       ├── SKILL.md                             # Auto-activating skill
-│       ├── scripts/
-│       │   └── resolve-project.sh              # Project path resolution logic
-│       └── references/
-│           ├── glab-commands.md                # Full glab flag reference
-│           ├── commit-conventions.md           # Commit format + GitLab keywords
-│           └── config-guide.md                 # .gitlab-workflow config docs
-└── commands/
-    ├── gitlab-issue.md                          # /gitlab-issue slash command
-    └── gitlab-commit.md                         # /gitlab-commit slash command
+```yaml
+stages:
+  - lint
+  - test
+  - docs
+  - merge
+
+variables:
+  CLAUDE_TOKEN: $CLAUDE_TOKEN # Provided by the user
+  GITLAB_TOKEN: $GITLAB_TOKEN # Provided by the repo
+
+lint:
+  stage: lint
+  image: $CI_PROJECT_DIR/ci/Dockerfile
+  script:
+    - claude_ci lint
+  artifacts:
+    paths:
+      - lint_report.txt
+
+test:
+  stage: test
+  image: $CI_PROJECT_DIR/ci/Dockerfile
+  script:
+    - claude_ci test
+  artifacts:
+    paths:
+      - test_report.xml
+
+docs:
+  stage: docs
+  image: $CI_PROJECT_DIR/ci/Dockerfile
+  script:
+    - claude_ci docs
+  artifacts:
+    paths:
+      - docs/
+
+merge:
+  stage: merge
+  image: $CI_PROJECT_DIR/ci/Dockerfile
+  when: manual
+  script:
+    - claude_ci merge
+  only:
+    - main
 ```
 
-The skill auto-activates based on context — no slash command needed for everyday use. The slash commands give you explicit, structured control when you want it.
+- The `claude_ci` wrapper calls the CLI with the appropriate sub‑command.
+- Each stage can be overridden by adding an alias in the CLI (`claude ci <stage>`).
 
 ---
 
-## Troubleshooting
+## 8. CLI Skeleton (Python + Typer)
 
-**`glab: command not found`**
-Install glab: `brew install glab` (macOS) or see [glab installation docs](https://gitlab.com/gitlab-org/cli#installation).
+```python
+# cli/main.py
+import typer
+import os
+from .prompts import load_prompt
+from .. import claude_api, gitlab_api, utils
 
-**Comments posting as the wrong user**
-Run `glab auth status` to check which account is active. Switch with `glab auth login`.
+app = typer.Typer(help="GitLab + Claude DevOps Assistant")
 
-**Wrong project being targeted**
-Paste the full issue URL, or create a `.gitlab-workflow` file with `issue_project=group/project`.
+@app.command()
+def init():
+    """Create .claude.yaml and set up the repo."""
+    utils.create_default_config()
+    typer.echo("✅ Initialized .claude.yaml")
 
-**`ERROR: 404 Not Found`**
-Check that your glab token has access to the target project. Verify the project path with `glab repo view -R group/project`.
+@app.command()
+def create(user_input: str):
+    """Interactively create an issue."""
+    prompt = load_prompt("issue_create.md")
+    response = claude_api.send(prompt.format(
+        project_name=utils.project_name(),
+        user_input=user_input,
+        default_assignee=utils.default_assignee()
+    ))
+    issue = utils.parse_json(response)
+    gitlab_api.create_issue(issue)
+    typer.echo(f"Issue #{issue['iid']} created")
 
-**`glab auth login` for a self-hosted GitLab instance**
-```bash
-glab auth login --hostname gitlab.yourcompany.com
+@app.command()
+def link_commit(sha: str):
+    """Link a commit to the most relevant open issue."""
+    commit = gitlab_api.get_commit(sha)
+    prompt = load_prompt("commit_link.md")
+    response = claude_api.send(prompt.format(
+        commit_message=commit.message,
+        sha=sha
+    ))
+    data = utils.parse_json(response)
+    if "issue_id" in data:
+        gitlab_api.add_issue_comment(data["issue_id"],
+            f"Linked by commit {sha}: {data['comment']}")
+    else:
+        gitlab_api.create_issue({"title": data["suggestion_title"]})
+    typer.echo("✅ Commit linked")
+
+# Add more commands here...
+
+if __name__ == "__main__":
+    app()
 ```
+
+- The CLI is intentionally lightweight; all heavy lifting is done by the Claude wrapper and GitLab API.
 
 ---
 
-## License
+## 9. Testing Strategy
 
-MIT
+| Layer       | Tool                                      | Focus                                                                                                                                |
+| ----------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit        | `pytest`                                  | CLI command parsing, prompt rendering, response parsing.                                                                             |
+| Integration | `unittest.mock` + `python-gitlab` sandbox | Test GitLab API interactions without hitting the real API.                                                                           |
+| E2E         | Docker Compose                            | Spin up a local GitLab instance (or use GitLab CE), run `claude init`, push a commit, run pipeline, and assert board & issue states. |
+| Performance | Locust                                    | Simulate multiple users issuing commands to gauge latency.                                                                           |
+
+---
+
+## 10. Security & Compliance
+
+1. **No secrets in logs** – All outputs from Claude are redacted unless explicitly requested.
+2. **Token rotation** – GitLab OAuth tokens are refreshed automatically; only short‑lived tokens are stored.
+3. **Rate limiting** – The Claude wrapper enforces a per‑repo quota; excessive usage triggers a warning.
+4. **Audit trail** – Every CLI command is logged with timestamp, user, and resulting GitLab event.
+5. **Open‑source LLM** – Optionally deploy a self‑hosted Claude clone (e.g., Llama 3) behind a firewall for privacy‑constrained teams.
+
+---
+
+## 11. Future Enhancements (Roadmap)
+
+| Milestone              | Description                                                     | ETA     |
+| ---------------------- | --------------------------------------------------------------- | ------- |
+| **GraphQL sync**       | Use GitLab GraphQL for bulk data pulls (issues, boards).        | Q4 2026 |
+| **Multi‑repo support** | Manage several projects from a single CLI session.              | Q1 2027 |
+| **Web UI**             | A lightweight dashboard built with FastAPI + React.             | Q3 2026 |
+| **Fine‑tuning**        | Train a Claude‑style model on the repo’s past issues & commits. | Q2 2027 |
+| **Marketplace**        | Publish as a GitLab App (installable via UI).                   | Q1 2027 |
+
+---
+
+## 12. Quick‑Start Checklist
+
+1. **Install prerequisites** – Python 3.10+, Docker, GitLab personal access token.
+2. **Clone repo** and run `claude init`.
+3. **Run a local CI job**: `docker run -e GITLAB_TOKEN=… -e CLAUDE_TOKEN=… gitlab-claude-assistant:latest claude_ci lint`.
+4. **Create an issue**: `claude create "Add password reset flow"` – watch as the issue gets auto‑filled and labelled.
+5. **Commit**: `git commit -m "Add password reset flow #123"`.
+6. **Push & let the CI pipeline finish**.

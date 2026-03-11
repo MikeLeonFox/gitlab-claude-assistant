@@ -1,34 +1,44 @@
-# .gitlab-workflow Config File
+# .gitlab-workflow.json Config File
 
-Tells the plugin which GitLab project your issues live in. Create this file at your repo root, paste in any GitLab URL from that project, and you're done.
+Tells the plugin which GitLab project your issues live in. Create this file at your repo root with a `url` key pointing to any GitLab URL from that project.
 
 ## Setup
 
 1. Open your GitLab issue board (or any page in the project)
 2. Copy the URL from the browser
-3. Paste it into `.gitlab-workflow`:
+3. Create `.gitlab-workflow.json`:
 
 ```bash
-echo "https://gitlab.example.com/group/project/-/boards" > .gitlab-workflow
-echo ".gitlab-workflow" >> .gitignore
+echo '{ "url": "https://gitlab.example.com/group/project/-/boards" }' > .gitlab-workflow.json
+echo ".gitlab-workflow.json" >> .gitignore
 ```
 
-That's it. Any GitLab URL from that project works — board, issue, MR, pipeline, the project root:
+## Format
 
-```
-# Any of these work:
-https://gitlab.example.com/group/project/-/boards
-https://gitlab.example.com/group/project/-/boards/1234
-https://gitlab.example.com/group/project/-/issues
-https://gitlab.example.com/group/project/-/issues/42
-https://gitlab.example.com/group/project
+```json
+{
+  "url": "https://gitlab.example.com/group/project/-/boards"
+}
 ```
 
-Comments starting with `#` and blank lines are ignored, so you can annotate the file:
+Any GitLab URL from the project works for `url` — board, issue list, a specific issue, MR, or the project root:
 
+```json
+{ "url": "https://gitlab.example.com/group/project/-/boards" }
+{ "url": "https://gitlab.example.com/group/project/-/boards/1234" }
+{ "url": "https://gitlab.example.com/group/project/-/issues" }
+{ "url": "https://gitlab.example.com/group/project/-/issues/42" }
+{ "url": "https://gitlab.example.com/group/project" }
 ```
-# Issue tracker for the mobile team
-https://gitlab.example.com/department/mobile-team/sprint-board/-/boards
+
+You can add extra fields for your own reference — the script only reads `url`:
+
+```json
+{
+  "url": "https://gitlab.example.com/department/mobile-team/sprint-board/-/boards",
+  "description": "Issue tracker for the mobile team",
+  "team": "mobile"
+}
 ```
 
 ## Resolution Priority
@@ -39,7 +49,7 @@ The plugin resolves the project in this order:
 |----------|--------|---------|
 | 1 | Direct URL argument | Paste a URL when Claude asks |
 | 2 | `GITLAB_ISSUE_PROJECT` env var | `export GITLAB_ISSUE_PROJECT=https://.../-/boards` |
-| 3 | `.gitlab-workflow` config file | Paste a board URL in the file |
+| 3 | `.gitlab-workflow.json` config file | `{ "url": "https://..." }` |
 | 4 | Git remote `origin` | Auto-detected when working in the issue project |
 | 5 | None found | Claude asks you |
 
@@ -49,7 +59,7 @@ The file is found by walking **up** from the current directory. One file at a mo
 
 ```
 ~/projects/
-├── .gitlab-workflow      ← covers everything below
+├── .gitlab-workflow.json   ← covers everything below
 ├── my-api/
 └── my-frontend/
 ```

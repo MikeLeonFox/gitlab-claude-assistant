@@ -5,13 +5,13 @@
 # Priority order:
 #   1. Argument passed directly: resolve-project.sh "https://.../-/boards" or "group/project"
 #   2. GITLAB_ISSUE_PROJECT environment variable (URL or path)
-#   3. .gitlab-workflow config file (nearest, walking up from CWD)
-#      — contains a pasted GitLab URL (board, issue, project, MR, etc.)
+#   3. .gitlab-workflow.json config file (nearest, walking up from CWD)
+#      — JSON file with a "url" key containing any GitLab URL
 #   4. Current git remote origin (if it's a GitLab remote)
 #   5. Exits with error — caller must ask the user
 #
-# .gitlab-workflow format — just paste any GitLab URL on the first line:
-#   https://gitlab.example.com/group/project/-/boards
+# .gitlab-workflow.json format:
+#   { "url": "https://gitlab.example.com/group/project/-/boards" }
 #
 # Usage:
 #   PROJECT=$(bash resolve-project.sh [url-or-path])
@@ -50,12 +50,12 @@ git_remote_project() {
   esac
 }
 
-# --- Helper: find .gitlab-workflow config walking up directories ---
+# --- Helper: find .gitlab-workflow.json config walking up directories ---
 find_config() {
   local dir="$PWD"
   while [[ "$dir" != "/" ]]; do
-    if [[ -f "$dir/.gitlab-workflow" ]]; then
-      echo "$dir/.gitlab-workflow"
+    if [[ -f "$dir/.gitlab-workflow.json" ]]; then
+      echo "$dir/.gitlab-workflow.json"
       return 0
     fi
     dir=$(dirname "$dir")
@@ -63,13 +63,23 @@ find_config() {
   return 1
 }
 
-# Read the first non-empty, non-comment line from .gitlab-workflow
-# and parse it as a GitLab URL or project path.
+# Read "url" from .gitlab-workflow.json and parse it as a GitLab URL or project path.
+# Uses jq if available, falls back to python3.
 read_config_project() {
   local config_file value
   config_file=$(find_config) || return 1
-  # Skip blank lines and lines starting with #
-  value=$(grep -v -E '^\s*(#|$)' "$config_file" | head -1 | tr -d '[:space:]')
+
+  if command -v jq &>/dev/null; then
+    value=$(jq -r '.url // empty' "$config_file" 2>/dev/null)
+  else
+    value=$(python3 -c "
+import json, sys
+with open('$config_file') as f:
+    d = json.load(f)
+print(d.get('url', ''))
+" 2>/dev/null)
+  fi
+
   [[ -z "$value" ]] && return 1
   if [[ "$value" =~ ^https?:// ]]; then
     parse_gitlab_url "$value"

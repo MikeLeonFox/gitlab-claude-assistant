@@ -1,12 +1,22 @@
 ---
 name: gitlab-workflow
-description: This skill should be used when the user asks to "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", or mentions GitLab issue numbers (e.g. "#42", "issue 42"). Automates GitLab project management workflows using the glab CLI.
-version: 1.0.0
+description: Expert guidance for using the GitLab CLI (glab) to manage GitLab issues, merge requests, CI/CD pipelines, repositories, and other GitLab operations. Use this skill when the user needs to interact with GitLab resources — including "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", "monitor CI/CD", "trigger a pipeline", or mentions GitLab issue numbers (e.g. "#42", "issue 42").
+version: 2.0.0
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # GitLab Workflow Automation
 
-Automates GitLab project management using the `glab` CLI: commenting on issues, moving/updating issues, referencing issues in commits, and managing merge requests.
+Automates GitLab project management using the `glab` CLI: commenting on issues, moving/updating issues, referencing issues in commits, managing merge requests, monitoring CI/CD pipelines, and repository operations.
+
+## Prerequisites
+
+Verify glab is installed before executing commands:
+```bash
+glab --version
+```
+
+If not installed, inform the user and provide platform-specific installation guidance (e.g. `brew install glab` on macOS).
 
 ## Critical Rules
 
@@ -46,6 +56,25 @@ glab auth login
 
 ---
 
+## Authentication
+
+```bash
+# Interactive authentication
+glab auth login
+
+# Check authentication status
+glab auth status
+
+# For self-hosted GitLab
+glab auth login --hostname gitlab.example.org
+
+# Using environment variables
+export GITLAB_TOKEN=your-token
+export GITLAB_HOST=gitlab.example.org  # for self-hosted
+```
+
+---
+
 ## Resolving the Right GitLab Project
 
 Issues are often in a **different project** than the current working directory. Always resolve the correct project before running any `glab issue` command.
@@ -80,20 +109,26 @@ If no project can be resolved, ask once:
 
 Then offer to save it so they don't have to answer again:
 ```bash
-echo "issue_project=group/project" > .gitlab-workflow
-echo ".gitlab-workflow" >> .gitignore  # keep it local
+echo '{ "url": "https://gitlab.example.com/group/project/-/boards" }' > .gitlab-workflow.json
+echo ".gitlab-workflow.json" >> .gitignore  # keep it local
 ```
 
-### Config File: `.gitlab-workflow`
+### Config File: `.gitlab-workflow.json`
 
-Paste any GitLab URL from the issue project — the board URL is the most convenient. Place the file at the repo root (or any parent directory).
+Create this file at the repo root (or any parent directory) with a `url` key pointing to any GitLab URL from the project.
+
+```json
+{
+  "url": "https://gitlab.example.com/group/project/-/boards"
+}
+```
 
 ```bash
-echo "https://gitlab.example.com/group/project/-/boards" > .gitlab-workflow
-echo ".gitlab-workflow" >> .gitignore
+echo '{ "url": "https://gitlab.example.com/group/project/-/boards" }' > .gitlab-workflow.json
+echo ".gitlab-workflow.json" >> .gitignore
 ```
 
-Any URL from the project works: board, issue list, a specific issue, MR, the project root. The plugin extracts the project path automatically.
+Any URL from the project works for `url`: board, issue list, a specific issue, MR, the project root. The plugin extracts the project path automatically.
 
 ### Using -R Flag
 
@@ -235,10 +270,123 @@ glab issue list -R <project> --label "in-progress"
 glab issue list -R <project> --assignee @me
 ```
 
+### 7. Reviewing Merge Requests
+
+```bash
+# List MRs awaiting your review
+glab mr list --reviewer=@me
+
+# Checkout MR locally to test
+glab mr checkout <mr-number>
+
+# Approve MR after testing
+glab mr approve <mr-number>
+
+# Add review comment
+glab mr note <mr-number> -m "Please update tests"
+```
+
+### 8. Monitoring CI/CD
+
+```bash
+# Watch pipeline in progress (interactive)
+glab pipeline ci view
+
+# Check pipeline status
+glab ci status
+
+# View logs if failed
+glab ci trace
+
+# Retry failed pipeline
+glab ci retry
+
+# Trigger a pipeline
+glab ci run
+
+# Lint CI config before pushing
+glab ci lint
+```
+
+---
+
+## Common Patterns
+
+### Working Outside Repository Context
+
+When not in a Git repository, specify the repository:
+```bash
+glab mr list -R owner/repo
+glab issue list -R owner/repo
+```
+
+### Self-Hosted GitLab
+
+```bash
+export GITLAB_HOST=gitlab.example.org
+# or per-command
+glab repo clone gitlab.example.org/owner/repo
+```
+
+### Using the API Command
+
+```bash
+# Basic GET request
+glab api projects/:id/merge_requests
+
+# IMPORTANT: Pagination uses query parameters in URL, NOT flags
+# ❌ WRONG: glab api --per-page=100 projects/:id/jobs
+# ✓ CORRECT: glab api "projects/:id/jobs?per_page=100"
+
+# Auto-fetch all pages
+glab api --paginate "projects/:id/pipelines/123/jobs?per_page=100"
+
+# POST with data
+glab api --method POST projects/:id/issues --field title="Bug" --field description="Details"
+```
+
+### JSON Output for Scripting
+
+```bash
+glab mr list --output=json | jq '.[] | .title'
+```
+
+---
+
+## Common Issues Quick Fixes
+
+**"command not found: glab"** — Install glab or verify PATH
+
+**"401 Unauthorized"** — Run `glab auth login`
+
+**"404 Project Not Found"** — Verify repository name and access permissions
+
+**"not a git repository"** — Navigate to repo or use `-R owner/repo` flag
+
+**"source branch already has a merge request"** — Use `glab mr list` to find existing MR
+
+For detailed troubleshooting, load **references/troubleshooting.md**.
+
+---
+
+## Best Practices
+
+1. **Verify authentication** before executing commands: `glab auth status`
+2. **Use `--help`** to explore command options: `glab <command> --help`
+3. **Link MRs to issues** using "Closes #123" in MR description or commit
+4. **Lint CI config** before pushing: `glab ci lint`
+5. **Check repository context** when commands fail: `git remote -v`
+6. **Use JSON output** for scripting: `--output=json`
+
 ---
 
 ## Additional Resources
 
-- **`references/glab-commands.md`** — Full glab flag reference for issue and MR commands
+Load these references only when needed for deeper detail:
+
+- **`references/glab-commands.md`** — Full glab flag reference for all commands (issues, MRs, CI/CD, repos, labels, releases, variables, etc.)
+- **`references/quick-reference.md`** — Condensed command cheat sheet
 - **`references/commit-conventions.md`** — Conventional commit format and GitLab auto-close keywords
+- **`references/config-guide.md`** — `.gitlab-workflow` config file setup
+- **`references/troubleshooting.md`** — Detailed error scenarios and solutions
 - **`scripts/resolve-project.sh`** — Script to resolve the correct GitLab project path
