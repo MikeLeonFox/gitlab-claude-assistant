@@ -5,106 +5,56 @@ description: Create a git commit with a proper conventional commit message that 
 
 # GitLab Commit Command
 
-Create a conventionally-formatted git commit that references a GitLab issue.
+Arguments: $ARGUMENTS
 
-## Instructions
+## Step 1: Parse
 
-The user invoked `/gitlab-commit` with arguments: $ARGUMENTS
+- **Issue ref**: bare ID (`42`) or full URL
+- **Relation**: `closes` (default) or `relates`/`related`
 
-### Step 1: Parse arguments
+If URL: extract project path and issue ID.
 
-- **Issue reference** — bare ID (`42`) or full GitLab URL
-- **Relation** — `closes` (default) or `relates`/`related`
-
-If a full URL is provided, extract:
-- Project path (for cross-project reference): `group/project`
-- Issue ID: `42`
-
-### Step 2: Resolve cross-project reference
-
-If the issue is in a **different** repo than the current git project, use the full cross-project syntax in the commit footer instead of just `#42`:
+## Step 2: Resolve Cross-Project Reference
 
 ```bash
 PROJECT=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-project.sh)
-```
-
-Check if `$PROJECT` matches the current repo's remote:
-```bash
 git remote get-url origin
 ```
 
-If they differ, the commit footer needs the full path:
-```
-Closes group/project#42
-```
+If project differs from current repo remote → use `Closes group/project#42`; otherwise `Closes #42`.
 
-If they're the same:
-```
-Closes #42
-```
-
-### Step 3: Check staged changes
+## Step 3: Check Staged Changes
 
 ```bash
-git status
-git diff --cached --stat
+git status && git diff --cached --stat
 ```
 
-If nothing staged, show unstaged diff and ask the user which files to stage.
+If nothing staged, show unstaged diff and ask which files to stage.
 
-### Step 4: Determine commit message
+## Step 4: Determine Commit Message
 
-Ask the user (or infer from diff):
+Infer from diff or ask:
 - **Type**: `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`
-- **Scope** (optional): affected module or component
-- **Short description**: imperative mood, no capital, no period, max ~72 chars
+- **Scope** (optional): affected component
+- **Description**: imperative mood, lowercase, no period, ≤72 chars
 
-### Step 5: Compose and commit
+## Step 5: Commit
 
-**Closing an issue:**
 ```bash
-git commit -m "$(cat <<'EOF'
-<type>(<scope>): <description>
+git commit -m "<type>(<scope>): <description>
 
-Closes #<id>
-EOF
-)"
+Closes #<id>"
 ```
 
-**Cross-project close:**
-```bash
-git commit -m "$(cat <<'EOF'
-<type>(<scope>): <description>
+Variations:
+- Omit scope: `feat: description`
+- Cross-project: `Closes group/project#<id>`
+- Reference only: `Related to #<id>`
 
-Closes group/project#<id>
-EOF
-)"
-```
+Use heredoc form to preserve newlines — `git commit -m $'...\n\nCloses #N'` or a real multi-line string. Confirm message with user if unsure. `Closes #N` only auto-closes on merge to the **default branch**.
 
-**Reference only (no auto-close):**
-```bash
-git commit -m "$(cat <<'EOF'
-<type>(<scope>): <description>
+## Step 6: Offer Next Steps
 
-Related to #<id>
-EOF
-)"
-```
-
-Always use the heredoc form to preserve newlines in the commit message.
-
-### Step 6: Offer next steps
-
-After committing:
 - Push: `git push`
 - Create MR: `glab mr create --fill`
-- Comment on the issue (resolve project first, write in first person):
-  ```bash
-  glab issue note <id> -R <project> -m "Committed the fix. Opening MR shortly."
-  ```
-
-## Notes
-
-- `Closes #N` only auto-closes when merged into the **default branch**
-- Omit scope parentheses if scope is unknown: `feat: description`
-- Confirm the commit message with the user before committing if unsure
+- Comment: `glab issue note <id> -R <project> -m "Committed the fix. Opening MR shortly."`
