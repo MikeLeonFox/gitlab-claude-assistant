@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Local GitLab config (contains project-specific URLs, keep local)
+.gitlab-workflow.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
