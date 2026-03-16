@@ -15,9 +15,11 @@ Arguments: $ARGUMENTS
 
 If URL: project path = everything between host and `/-/`; ID = number after `/issues/`.
 
-## Step 2: Resolve Project
+## Step 2: Resolve Host and Project
 
 ```bash
+GITLAB_HOST=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-host.sh)
+export GITLAB_HOST
 PROJECT=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-project.sh)
 ```
 
@@ -52,6 +54,8 @@ glab issue update <id> -R "$PROJECT" --label "in-progress" --unlabel "to-do" --a
 glab issue note <id> -R "$PROJECT" -m "Starting work on this."
 git checkout -b feat/issue-<id>-<short-title>
 ```
+
+Use `/gitlab-commit <id>` when committing — it auto-posts commit notes back to this issue.
 
 ### `finish`
 ```bash

@@ -1,7 +1,7 @@
 ---
 name: gitlab-workflow
 description: Expert guidance for using the GitLab CLI (glab) to manage GitLab issues, merge requests, CI/CD pipelines, repositories, and other GitLab operations. Use this skill when the user needs to interact with GitLab resources — including "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", "monitor CI/CD", "trigger a pipeline", or mentions GitLab issue numbers (e.g. "#42", "issue 42").
-version: 2.0.0
+version: 2.1.0
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -50,23 +50,12 @@ export GITLAB_TOKEN=your-token                 # env var alternative
 
 Never assume `gitlab.com`. Always resolve — **never hardcode**.
 
-Resolution order: `.gitlab-workflow.json` url field → `GITLAB_HOST` env var → git remote origin (skip github/bitbucket) → `glab auth status` first non-gitlab.com host → fall back to `gitlab.com`.
-
 ```bash
-GITLAB_HOST=$(
-  root=$(git rev-parse --show-toplevel 2>/dev/null) && \
-  h=$(jq -r '.url // empty' "$root/.gitlab-workflow.json" 2>/dev/null | sed -E 's|https?://([^/]+)/.*|\1|' | grep -v '^$') && \
-  [[ -n "$h" ]] && echo "$h" && exit
-  [[ -n "${GITLAB_HOST:-}" ]] && echo "$GITLAB_HOST" && exit
-  remote=$(git remote get-url origin 2>/dev/null) && \
-  h=$(echo "$remote" | sed -E 's|https?://([^/]+)/.*|\1|; s|git@([^:]+):.*|\1|') && \
-  echo "$h" | grep -Eqv 'github\.com|bitbucket\.org' && echo "$h" && exit
-  glab auth status 2>&1 | grep -E 'Logged in to' | grep -v 'gitlab\.com' | sed -E 's/.*Logged in to ([^ ]+).*/\1/' | head -1 && exit
-  echo "gitlab.com"
-) 2>/dev/null
+GITLAB_HOST=$(bash ${CLAUDE_SKILL_DIR}/scripts/resolve-host.sh)
+export GITLAB_HOST  # glab picks this up automatically — no -hostname flag needed
 ```
 
-Always pass `--hostname "$GITLAB_HOST"` to all `glab api` calls.
+Resolution order: `.gitlab-workflow.json` url → `GITLAB_HOST` env var → git remote origin (skips github/bitbucket) → `glab auth status` first non-gitlab.com host → `gitlab.com`.
 
 ---
 
@@ -119,6 +108,21 @@ Related to #42         # reference only
 Closes group/project#42  # cross-project
 ```
 
+### Issueboard Workflow (with commit auto-mention)
+
+Full cycle for working from an issue board — every commit auto-posts to the linked issue:
+
+1. **Start** — `glab issue start` (or `/gitlab-issue 42 start`) → assigns, labels, branches, comments
+2. **Commit** — `/gitlab-commit 42 ["optional note"]` → conventional commit + auto-posts commit note to issue; optional message appended to the note for extra context
+3. **Finish** — `/gitlab-issue 42 finish` → MR, label update, MR link posted to issue
+
+**Auto-mention after every commit referencing an issue:**
+```bash
+COMMIT_SHA=$(git rev-parse --short HEAD)
+BRANCH=$(git branch --show-current)
+glab issue note <id> -R "$PROJECT" -m "Committed \`$COMMIT_SHA\` on \`$BRANCH\`: <commit description>"
+```
+
 ### Start Issue
 1. `glab issue view <id> -R <project>`
 2. `glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do" --assignee <username>`
@@ -136,7 +140,7 @@ Closes group/project#42  # cross-project
 ```bash
 glab issue list -R <project> --label "in-progress"
 # Global (all projects):
-glab api --hostname "$GITLAB_HOST" "issues?scope=assigned_to_me&state=opened" | jq -r '.[] | "[\(.labels | map(select(startswith("status::"))) | first // "no status")] \(.references.full) — \(.title)"'
+glab api "issues?scope=assigned_to_me&state=opened" | jq -r '.[] | "[\(.labels | map(select(startswith("status::"))) | first // "no status")] \(.references.full) — \(.title)"'
 ```
 
 ### CI/CD
@@ -185,3 +189,4 @@ glab mr list --output=json | jq '.[] | .title'
 - `references/config-guide.md` — `.gitlab-workflow.json` setup
 - `references/troubleshooting.md` — detailed error scenarios
 - `scripts/resolve-project.sh` — project resolution script
+- `scripts/resolve-host.sh` — hostname resolution script

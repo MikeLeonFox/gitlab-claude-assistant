@@ -42,6 +42,30 @@ You can also invoke commands directly:
 | `/gitlab-workflow:gitlab-issue 42 move` | Transition workflow labels |
 | `/gitlab-workflow:gitlab-commit 42` | Conventional commit that closes #42 |
 | `/gitlab-workflow:gitlab-commit 42 relates` | Commit that references (not closes) #42 |
+| `/gitlab-workflow:gitlab-commit 42 "note"` | Commit + append a custom note to the issue |
+
+## Issueboard Workflow
+
+Work from your GitLab issue board with full two-way traceability — every commit automatically posts back to the linked issue.
+
+**1. Start an issue**
+```
+/gitlab-workflow:gitlab-issue 42 start
+```
+Assigns the issue to you, moves it to `in-progress`, posts a comment, and creates a local branch.
+
+**2. Commit (repeat as needed)**
+```
+/gitlab-workflow:gitlab-commit 42
+/gitlab-workflow:gitlab-commit 42 "refactored auth layer before tackling main fix"
+```
+Creates a conventional commit with the issue reference and auto-posts a note to the issue with the commit SHA, branch, and description. The optional message is appended for extra context.
+
+**3. Finish**
+```
+/gitlab-workflow:gitlab-issue 42 finish
+```
+Pushes the branch, opens an MR, moves the issue to `review`, and posts the MR link to the issue.
 
 ## Configuration
 
@@ -66,6 +90,8 @@ The plugin resolves the project in this order:
 3. `.gitlab-workflow.json` file (walks up from current directory)
 4. Git remote `origin` (if it's a GitLab remote)
 5. Asks you
+
+The GitLab hostname is resolved automatically from the same sources (plus `glab auth status`) — no manual configuration needed for self-hosted instances.
 
 ## License
 
