@@ -1,6 +1,6 @@
 ---
 name: gitlab-commit
-description: Create a git commit with a proper conventional commit message that references or closes a GitLab issue. Usage: /gitlab-commit <issue-id-or-url> [closes|relates] ["optional note message"] — stages changes and commits with the correct format. The optional message is appended to the auto-posted issue note.
+description: Create a git commit with a proper conventional commit message that references or closes a GitLab issue. Usage: /gitlab-commit [issue-id-or-url] [closes|relates] ["optional note message"] — issue ID is optional if a current issue is saved in .gitlab-workflow.json. The optional message is appended to the auto-posted issue note.
 ---
 
 # GitLab Commit Command
@@ -9,15 +9,20 @@ Arguments: $ARGUMENTS
 
 ## Step 1: Parse
 
-- **Issue ref**: bare ID (`42`) or full URL
+- **Issue ref** (optional): bare ID (`42`) or full URL — if omitted, read from `.gitlab-workflow.json`:
+  ```bash
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+  ISSUE_ID=$(jq -r '.issue // empty' "$root/.gitlab-workflow.json" 2>/dev/null)
+  ```
+  If still not found, ask the user.
 - **Relation**: `closes` (default) or `relates`/`related`
 - **Note message** (optional): any remaining text after the relation keyword — used as extra context in the issue note (e.g. what changed, what was discovered, what's next)
 
 Examples:
-- `/gitlab-commit 42` — closes, note uses commit description only
-- `/gitlab-commit 42 relates` — reference only
-- `/gitlab-commit 42 "refactored token logic before tackling the main fix"` — closes + custom note
-- `/gitlab-commit 42 relates "partial fix, null case only"` — reference + custom note
+- `/gitlab-commit` — reads saved issue, closes, note uses commit description only
+- `/gitlab-commit 42` — explicit ID, closes
+- `/gitlab-commit relates "partial fix, null case only"` — reads saved issue, reference + custom note
+- `/gitlab-commit 42 "refactored token logic before tackling the main fix"` — explicit ID + custom note
 
 If URL: extract project path and issue ID.
 

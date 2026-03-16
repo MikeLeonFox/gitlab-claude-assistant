@@ -112,9 +112,11 @@ Closes group/project#42  # cross-project
 
 Full cycle for working from an issue board — every commit auto-posts to the linked issue:
 
-1. **Start** — `glab issue start` (or `/gitlab-issue 42 start`) → assigns, labels, branches, comments
-2. **Commit** — `/gitlab-commit 42 ["optional note"]` → conventional commit + auto-posts commit note to issue; optional message appended to the note for extra context
-3. **Finish** — `/gitlab-issue 42 finish` → MR, label update, MR link posted to issue
+1. **Start** — `/gitlab-issue 42 start` → assigns, labels, branches, comments, saves `"issue": 42` to `.gitlab-workflow.json`
+2. **Commit** — `/gitlab-commit ["optional note"]` → reads saved issue ID, conventional commit + auto-posts note to issue
+3. **Finish** — `/gitlab-issue finish` → MR, label update, MR link posted to issue, clears `issue` from config
+
+Issue ID is saved on `start` and cleared on `finish` — no need to repeat it for every commit or finish.
 
 **Auto-mention after every commit referencing an issue:**
 ```bash

@@ -1,6 +1,6 @@
 ---
 name: gitlab-issue
-description: Interact with a GitLab issue — view, comment, update labels/assignee, start work, or finish and open an MR. Usage: /gitlab-issue <id-or-url> [action] where action is one of: view, comment, start, finish, move.
+description: Interact with a GitLab issue — view, comment, update labels/assignee, start work, or finish and open an MR. Usage: /gitlab-issue <id-or-url> [action] where action is one of: view, comment, start, finish, move. Issue ID is optional if a current issue is saved in .gitlab-workflow.json.
 ---
 
 # GitLab Issue Command
@@ -12,6 +12,13 @@ Arguments: $ARGUMENTS
 - **Issue ref**: bare ID (`42`) or full URL (`https://gitlab.example.com/group/project/-/issues/42`)
 - **Action**: `view` (default) | `comment` | `start` | `finish` | `move`
 - **Extra context**: comment text, target label, etc.
+
+If no issue ref is provided, read it from `.gitlab-workflow.json`:
+```bash
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+ISSUE_ID=$(jq -r '.issue // empty' "$root/.gitlab-workflow.json" 2>/dev/null)
+```
+If still not found, ask the user.
 
 If URL: project path = everything between host and `/-/`; ID = number after `/issues/`.
 
@@ -55,7 +62,19 @@ glab issue note <id> -R "$PROJECT" -m "Starting work on this."
 git checkout -b feat/issue-<id>-<short-title>
 ```
 
-Use `/gitlab-commit <id>` when committing — it auto-posts commit notes back to this issue.
+Then save the active issue to `.gitlab-workflow.json` so subsequent `/gitlab-commit` and `/gitlab-issue finish` calls don't need the ID:
+```bash
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+config="$root/.gitlab-workflow.json"
+if [[ -f "$config" ]]; then
+  jq --argjson id <id> '. + {"issue": $id}' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+else
+  echo "{\"issue\": <id>}" > "$config"
+fi
+grep -qxF '.gitlab-workflow.json' "$root/.gitignore" 2>/dev/null || echo ".gitlab-workflow.json" >> "$root/.gitignore"
+```
+
+Use `/gitlab-commit` when committing — it reads the saved issue and auto-posts commit notes back to it.
 
 ### `finish`
 ```bash
@@ -67,6 +86,13 @@ git push -u origin <current-branch>
 glab mr create --fill --target-branch main
 glab issue update <id> -R "$PROJECT" --label "review" --unlabel "in-progress"
 glab issue note <id> -R "$PROJECT" -m "MR up for review: !<mr-number>"
+```
+
+Then clear the active issue from `.gitlab-workflow.json`:
+```bash
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+config="$root/.gitlab-workflow.json"
+[[ -f "$config" ]] && jq 'del(.issue)' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
 ```
 
 ### `move`

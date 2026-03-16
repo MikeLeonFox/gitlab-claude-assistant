@@ -43,6 +43,7 @@ You can also invoke commands directly:
 | `/gitlab-workflow:gitlab-commit 42` | Conventional commit that closes #42 |
 | `/gitlab-workflow:gitlab-commit 42 relates` | Commit that references (not closes) #42 |
 | `/gitlab-workflow:gitlab-commit 42 "note"` | Commit + append a custom note to the issue |
+| `/gitlab-workflow:gitlab-commit` | Commit using saved issue ID (set by `start`) |
 
 ## Issueboard Workflow
 
@@ -52,20 +53,20 @@ Work from your GitLab issue board with full two-way traceability — every commi
 ```
 /gitlab-workflow:gitlab-issue 42 start
 ```
-Assigns the issue to you, moves it to `in-progress`, posts a comment, and creates a local branch.
+Assigns the issue to you, moves it to `in-progress`, posts a comment, creates a local branch, and saves the active issue ID to `.gitlab-workflow.json`.
 
 **2. Commit (repeat as needed)**
 ```
-/gitlab-workflow:gitlab-commit 42
-/gitlab-workflow:gitlab-commit 42 "refactored auth layer before tackling main fix"
+/gitlab-workflow:gitlab-commit
+/gitlab-workflow:gitlab-commit "refactored auth layer before tackling main fix"
 ```
-Creates a conventional commit with the issue reference and auto-posts a note to the issue with the commit SHA, branch, and description. The optional message is appended for extra context.
+Reads the saved issue ID — no need to repeat it. Creates a conventional commit with the issue reference and auto-posts a note to the issue with the commit SHA, branch, and description. The optional message is appended for extra context.
 
 **3. Finish**
 ```
-/gitlab-workflow:gitlab-issue 42 finish
+/gitlab-workflow:gitlab-issue finish
 ```
-Pushes the branch, opens an MR, moves the issue to `review`, and posts the MR link to the issue.
+Pushes the branch, opens an MR, moves the issue to `review`, posts the MR link to the issue, and clears the active issue from `.gitlab-workflow.json`.
 
 ## Configuration
 
