@@ -34,6 +34,12 @@ If not found, ask: *"Which GitLab project? (e.g. `group/project` or paste the is
 
 Offer to save: `echo '{ "url": "https://..." }' > .gitlab-workflow.json && echo ".gitlab-workflow.json" >> .gitignore`
 
+## Content Style
+
+- Issue descriptions and notes: **2-3 sentences max** — plain language, no jargon, no markdown headers
+- When displaying an issue, summarize the description for the user in 2-3 sentences if it is long
+- Comments posted as first person (never "Claude:"). Confirm wording before posting.
+
 ## Step 3: Verify Auth (first run in session)
 
 ```bash
@@ -56,11 +62,15 @@ glab issue note <id> -R "$PROJECT" -m "<comment>"
 ### `start`
 ```bash
 glab issue view <id> -R "$PROJECT"
+# Check other issues on the board for label conventions before applying:
+glab issue list -R "$PROJECT" --output=json | jq -r '.[].labels[]?' | sort -u
 # get username from: glab auth status
 glab issue update <id> -R "$PROJECT" --label "in-progress" --unlabel "to-do" --assignee <username>
 glab issue note <id> -R "$PROJECT" -m "Starting work on this."
 git checkout -b feat/issue-<id>-<short-title>
 ```
+
+Apply labels consistent with what other issues use. If the board uses a `status::` scoped label (e.g. `status::in-progress`), use that instead of a plain label.
 
 Then save the active issue to `.gitlab-workflow.json` so subsequent `/gitlab-commit` and `/gitlab-issue finish` calls don't need the ID:
 ```bash
@@ -84,6 +94,8 @@ Closes #<id>"
 # cross-project: "Closes group/project#<id>"
 git push -u origin <current-branch>
 glab mr create --fill --target-branch main
+# Check board label conventions before applying:
+glab issue list -R "$PROJECT" --output=json | jq -r '.[].labels[]?' | sort -u
 glab issue update <id> -R "$PROJECT" --label "review" --unlabel "in-progress"
 glab issue note <id> -R "$PROJECT" -m "MR up for review: !<mr-number>"
 ```

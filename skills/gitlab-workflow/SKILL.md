@@ -1,7 +1,7 @@
 ---
 name: gitlab-workflow
 description: Expert guidance for using the GitLab CLI (glab) to manage GitLab issues, merge requests, CI/CD pipelines, repositories, and other GitLab operations. Use this skill when the user needs to interact with GitLab resources — including "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", "monitor CI/CD", "trigger a pipeline", or mentions GitLab issue numbers (e.g. "#42", "issue 42").
-version: 2.1.1
+version: 2.1.2
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -52,8 +52,10 @@ Never assume `gitlab.com`. Always resolve — **never hardcode**.
 
 ```bash
 GITLAB_HOST=$(bash ${CLAUDE_SKILL_DIR}/scripts/resolve-host.sh)
-export GITLAB_HOST  # glab picks this up automatically — no -hostname flag needed
+export GITLAB_HOST  # glab picks this up automatically — no --hostname flag needed
 ```
+
+> **CRITICAL:** `--hostname` is only valid for `glab auth login`. It does **NOT** exist on `glab issue`, `glab mr`, `glab api`, or any other subcommand — passing it will fail with `Unknown flag: --hostname`. Always use `export GITLAB_HOST` instead.
 
 Resolution order: `.gitlab-workflow.json` url → `GITLAB_HOST` env var → git remote origin (skips github/bitbucket) → `glab auth status` first non-gitlab.com host → `gitlab.com`.
 
@@ -121,15 +123,19 @@ Issue ID is saved on `start` and cleared on `finish` — no need to repeat it fo
 **Auto-mention after every commit referencing an issue:**
 ```bash
 COMMIT_SHA=$(git rev-parse --short HEAD)
+COMMIT_SHA_FULL=$(git rev-parse HEAD)
 BRANCH=$(git branch --show-current)
-glab issue note <id> -R "$PROJECT" -m "Committed \`$COMMIT_SHA\` on \`$BRANCH\`: <commit description>"
+COMMIT_URL="https://$GITLAB_HOST/$PROJECT/-/commit/$COMMIT_SHA_FULL"
+glab issue note <id> -R "$PROJECT" -m "Committed [$COMMIT_SHA]($COMMIT_URL) on \`$BRANCH\`: <commit description>"
 ```
+The linked SHA makes the commit clickable in the issue and triggers GitLab's cross-reference in the issue timeline.
 
 ### Start Issue
 1. `glab issue view <id> -R <project>`
-2. `glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do" --assignee <username>`
-3. `glab issue note <id> -R <project> -m "Starting work on this."`
-4. `git checkout -b feat/issue-<id>-short-description`
+2. Check board labels: `glab issue list -R <project> --output=json | jq -r '.[].labels[]?' | sort -u`
+3. `glab issue update <id> -R <project> --label "in-progress" --unlabel "to-do" --assignee <username>` (use scoped labels like `status::in-progress` if the board uses them)
+4. `glab issue note <id> -R <project> -m "Starting work on this."`
+5. `git checkout -b feat/issue-<id>-short-description`
 
 ### Finish Issue / Open MR
 1. Commit with `Closes #<id>` footer
@@ -180,6 +186,7 @@ glab mr list --output=json | jq '.[] | .title'
 | `404 Project Not Found` | check `-R` value and permissions |
 | `not a git repository` | use `-R owner/repo` |
 | `source branch already has a MR` | `glab mr list` to find it |
+| `Unknown flag: --hostname` | Use `export GITLAB_HOST=...` — `--hostname` only works with `glab auth login` |
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "gitlab-workflow",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Automates GitLab issue management, merge requests, CI/CD monitoring, and commit workflows using the glab CLI.",
   "author": {
     "name": "mike.fox"

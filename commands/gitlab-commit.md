@@ -73,12 +73,15 @@ After committing, post a note to the linked issue with the commit reference:
 
 ```bash
 COMMIT_SHA=$(git rev-parse --short HEAD)
+COMMIT_SHA_FULL=$(git rev-parse HEAD)
 BRANCH=$(git branch --show-current)
-glab issue note <id> -R "$PROJECT" -m "Committed \`$COMMIT_SHA\` on \`$BRANCH\`: <commit description>
+COMMIT_URL="https://$GITLAB_HOST/$PROJECT/-/commit/$COMMIT_SHA_FULL"
+glab issue note <id> -R "$PROJECT" -m "Committed [$COMMIT_SHA]($COMMIT_URL) on \`$BRANCH\`: <commit description>
 
 <note message if provided>"
 ```
 
+- Link format `[$COMMIT_SHA]($COMMIT_URL)` makes the commit clickable in the issue and causes GitLab to cross-reference the commit in the issue timeline when pushed.
 - If the user supplied a note message, append it on a new line after the commit description.
 - If no message was supplied, omit the second line entirely.
 
