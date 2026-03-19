@@ -1,7 +1,7 @@
 ---
 name: gitlab-workflow
 description: Expert guidance for using the GitLab CLI (glab) to manage GitLab issues, merge requests, CI/CD pipelines, repositories, and other GitLab operations. Use this skill when the user needs to interact with GitLab resources — including "comment on a GitLab issue", "add a note to an issue", "move an issue", "update issue labels", "assign an issue", "reference an issue in a commit", "close an issue via commit", "link a commit to an issue", "create a merge request for an issue", "open a GitLab MR", "transition an issue", "start working on an issue", "finish an issue", "monitor CI/CD", "trigger a pipeline", or mentions GitLab issue numbers (e.g. "#42", "issue 42").
-version: 2.1.2
+version: 2.2.0
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -130,6 +130,16 @@ glab issue note <id> -R "$PROJECT" -m "Committed [$COMMIT_SHA]($COMMIT_URL) on \
 ```
 The linked SHA makes the commit clickable in the issue and triggers GitLab's cross-reference in the issue timeline.
 
+### Fix Issue Labels & Epic
+
+Use when user says an issue "needs the right labels", "needs to match other issues", "normalize", "fix up", or "align with siblings".
+
+```bash
+bash ${CLAUDE_SKILL_DIR}/scripts/fix-issue-labels-and-epic.sh <issue_iid>
+```
+
+Fetches all open sibling issues, finds the most common namespaced label per namespace (`project::X`, `status::X`, `tribe::X`, etc.), applies missing ones to the target, removes orphan labels (non-namespaced and absent from all siblings), and links the most common epic if siblings share one. Prints a summary of all changes.
+
 ### Start Issue
 1. `glab issue view <id> -R <project>`
 2. Check board labels: `glab issue list -R <project> --output=json | jq -r '.[].labels[]?' | sort -u`
@@ -199,3 +209,4 @@ glab mr list --output=json | jq '.[] | .title'
 - `references/troubleshooting.md` — detailed error scenarios
 - `scripts/resolve-project.sh` — project resolution script
 - `scripts/resolve-host.sh` — hostname resolution script
+- `scripts/fix-issue-labels-and-epic.sh` — normalize issue labels and epic to match sibling issues
