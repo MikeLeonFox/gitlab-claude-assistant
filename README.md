@@ -43,7 +43,8 @@ You can also invoke commands directly:
 | `/gitlab-workflow:gitlab-commit 42` | Conventional commit that closes #42 |
 | `/gitlab-workflow:gitlab-commit 42 relates` | Commit that references (not closes) #42 |
 | `/gitlab-workflow:gitlab-commit 42 "note"` | Commit + append a custom note to the issue |
-| `/gitlab-workflow:gitlab-commit` | Commit using saved issue ID (set by `start`) |
+| `/gitlab-workflow:gitlab-commit` | Commit using saved issue ID, or plain commit if none |
+| `fix issue #42 labels` | Normalize labels and epic to match sibling issues |
 
 ## Issueboard Workflow
 
@@ -60,13 +61,25 @@ Assigns the issue to you, moves it to `in-progress`, posts a comment, creates a 
 /gitlab-workflow:gitlab-commit
 /gitlab-workflow:gitlab-commit "refactored auth layer before tackling main fix"
 ```
-Reads the saved issue ID — no need to repeat it. Creates a conventional commit with the issue reference and auto-posts a note to the issue with the commit SHA, branch, and description. The optional message is appended for extra context.
+Reads the saved issue ID — no need to repeat it. Creates a conventional commit with the issue reference and auto-posts a note to the issue with the commit SHA, branch, and description. The optional message is appended for extra context. If no issue is active, produces a plain conventional commit with no issue footer.
 
 **3. Finish**
 ```
 /gitlab-workflow:gitlab-issue finish
 ```
 Pushes the branch, opens an MR, moves the issue to `review`, posts the MR link to the issue, and clears the active issue from `.gitlab-workflow.json`.
+
+## Fix Issue Labels & Epic
+
+Normalize an issue to match the label patterns and epic used by other open issues in the same project:
+
+```
+Fix the labels on issue #42
+Issue 7 needs to match the other issues
+Normalize #15
+```
+
+The skill detects the most common namespaced label per namespace (`project::X`, `status::X`, `tribe::X`, etc.) across all open sibling issues, applies any missing ones to the target, removes orphan labels (non-namespaced labels not present on any sibling), and links the most common epic if one is shared. A summary of all changes is printed.
 
 ## Configuration
 
