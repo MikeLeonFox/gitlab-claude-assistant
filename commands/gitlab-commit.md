@@ -29,16 +29,29 @@ If URL: extract project path and issue ID.
 
 ## Step 2: Resolve Host and Project
 
+Skip this step if no issue was found in Step 1.
+
+```bash
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+GITLAB_URL=$(jq -r '.url // empty' "$root/.gitlab-workflow.json" 2>/dev/null)
+```
+
+**If `GITLAB_URL` is set** (primary path — use it directly, always prefer this):
+```bash
+GITLAB_HOST=$(echo "$GITLAB_URL" | sed 's|https://||' | cut -d'/' -f1)
+PROJECT=$(echo "$GITLAB_URL" | sed 's|https://[^/]*/||; s|/-/.*||')
+export GITLAB_HOST
+# Always use full cross-project form: Closes group/project#N
+```
+
+**If `GITLAB_URL` is absent** (fallback — derive from scripts + git remote):
 ```bash
 GITLAB_HOST=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-host.sh)
 export GITLAB_HOST
 PROJECT=$(bash ${CLAUDE_SKILL_DIR}/../skills/gitlab-workflow/scripts/resolve-project.sh)
 git remote get-url origin
+# If PROJECT differs from the git remote path → use Closes group/project#N; otherwise Closes #N
 ```
-
-If project differs from current repo remote → use `Closes group/project#42`; otherwise `Closes #42`.
-
-Skip this step if no issue was found in Step 1.
 
 ## Step 3: Check Staged Changes
 
@@ -57,7 +70,14 @@ Infer from diff or ask:
 
 ## Step 5: Commit
 
-**With issue:**
+**With issue — url present in config (always full form):**
+```bash
+git commit -m "<type>(<scope>): <description>
+
+Closes <group/project>#<id>"
+```
+
+**With issue — no url in config, same project:**
 ```bash
 git commit -m "<type>(<scope>): <description>
 
@@ -71,8 +91,7 @@ git commit -m "<type>(<scope>): <description>"
 
 Variations:
 - Omit scope: `feat: description`
-- Cross-project: `Closes group/project#<id>`
-- Reference only: `Related to #<id>`
+- Reference only: `Related to #<id>` / `Related to <group/project>#<id>`
 
 Use heredoc form to preserve newlines — `git commit -m $'...\n\nCloses #N'` or a real multi-line string. Confirm message with user if unsure. `Closes #N` only auto-closes on merge to the **default branch**.
 

@@ -69,11 +69,21 @@ Issues are often in a **different project** than the working directory. Always r
 - Project path: between host and `/-/` → `group/project`
 - Issue ID: number after `/issues/` → `42`
 
-**Otherwise:**
+**If `.gitlab-workflow.json` has a `url` field** (primary source — use it directly):
+```bash
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+GITLAB_URL=$(jq -r '.url // empty' "$root/.gitlab-workflow.json" 2>/dev/null)
+GITLAB_HOST=$(echo "$GITLAB_URL" | sed 's|https://||' | cut -d'/' -f1)
+PROJECT=$(echo "$GITLAB_URL" | sed 's|https://[^/]*/||; s|/-/.*||')
+export GITLAB_HOST
+```
+When the project path comes from the config url, always use the full `group/project#N` form in commit footers — do not compare against git remote.
+
+**Otherwise (fallback):**
 ```bash
 PROJECT=$(bash ${CLAUDE_SKILL_DIR}/scripts/resolve-project.sh)
 ```
-Checks: `GITLAB_ISSUE_PROJECT` env var → `.gitlab-workflow.json` → git remote origin.
+Checks: `GITLAB_ISSUE_PROJECT` env var → `.gitlab-workflow.json` project field → git remote origin.
 
 **If nothing found, ask once:**
 > "Which GitLab project? (e.g. `group/project` or paste the full issue URL)"
