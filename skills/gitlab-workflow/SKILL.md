@@ -125,20 +125,12 @@ Closes group/project#42  # cross-project
 Full cycle for working from an issue board — every commit auto-posts to the linked issue:
 
 1. **Start** — `/gitlab-issue 42 start` → assigns, labels, branches, comments, saves `"issue": 42` to `.gitlab-workflow.json`
-2. **Commit** — `/gitlab-commit ["optional note"]` → reads saved issue ID, conventional commit + auto-posts note to issue
+2. **Commit** — `/gitlab-commit` → reads saved issue ID, conventional commit with `Closes #N` or `Related to #N` footer
 3. **Finish** — `/gitlab-issue finish` → MR, label update, MR link posted to issue, clears `issue` from config
 
 Issue ID is saved on `start` and cleared on `finish` — no need to repeat it for every commit or finish.
 
-**Auto-mention after every commit referencing an issue:**
-```bash
-COMMIT_SHA=$(git rev-parse --short HEAD)
-COMMIT_SHA_FULL=$(git rev-parse HEAD)
-BRANCH=$(git branch --show-current)
-COMMIT_URL="https://$GITLAB_HOST/$PROJECT/-/commit/$COMMIT_SHA_FULL"
-glab issue note <id> -R "$PROJECT" -m "Committed [$COMMIT_SHA]($COMMIT_URL) on \`$BRANCH\`: <commit description>"
-```
-The linked SHA makes the commit clickable in the issue and triggers GitLab's cross-reference in the issue timeline.
+GitLab automatically cross-references commits in the issue timeline when pushed — no manual note needed. Cross-project references (`group/project#N`) only appear in the issue if the pusher has Reporter access to that project; if not, the reference is silently ignored and a manual note is needed.
 
 ### Fix Issue Labels & Epic
 

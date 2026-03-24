@@ -1,6 +1,6 @@
 ---
 name: gitlab-commit
-description: Create a git commit with a proper conventional commit message that optionally references or closes a GitLab issue. Usage: /gitlab-commit [issue-id-or-url] [closes|relates] ["optional note message"] — all arguments are optional; omitting an issue produces a plain conventional commit with no issue footer.
+description: Create a git commit with a proper conventional commit message that optionally references or closes a GitLab issue. Usage: /gitlab-commit [issue-id-or-url] [closes|relates] — all arguments are optional; omitting an issue produces a plain conventional commit with no issue footer.
 ---
 
 # GitLab Commit Command
@@ -16,14 +16,12 @@ Arguments: $ARGUMENTS
   ```
   If still not found, **proceed without an issue** — skip the issue footer and note steps entirely.
 - **Relation**: `closes` (default) or `relates`/`related`
-- **Note message** (optional): any remaining text after the relation keyword — used as extra context in the issue note (e.g. what changed, what was discovered, what's next)
-
 Examples:
 - `/gitlab-commit` — no issue anywhere → plain conventional commit, no footer
-- `/gitlab-commit` — saved issue found → closes saved issue + auto-posts note
+- `/gitlab-commit` — saved issue found → closes saved issue
 - `/gitlab-commit 42` — explicit ID, closes
-- `/gitlab-commit relates "partial fix, null case only"` — reads saved issue, reference + custom note
-- `/gitlab-commit 42 "refactored token logic before tackling the main fix"` — explicit ID + custom note
+- `/gitlab-commit relates` — reads saved issue, reference only
+- `/gitlab-commit 42 closes` — explicit ID, closes
 
 If URL: extract project path and issue ID.
 
@@ -95,27 +93,11 @@ Variations:
 
 Use heredoc form to preserve newlines — `git commit -m $'...\n\nCloses #N'` or a real multi-line string. Confirm message with user if unsure. `Closes #N` only auto-closes on merge to the **default branch**.
 
-## Step 6: Auto-Post Commit Note to Issue
+GitLab will automatically cross-reference the issue in its timeline when the commit is pushed — no manual note needed.
 
-**Skip entirely if no issue was found in Step 1.**
+**Cross-project caveat:** When the issue is in a different project (`Closes group/project#N`), the auto cross-reference only appears in the issue timeline if the pusher has at least Reporter access to that project. If it doesn't show up, post a manual note: `glab issue note <id> -R <project> -m "Referenced in commit <sha> on <repo>"`.
 
-Otherwise, post a note to the linked issue with the commit reference:
-
-```bash
-COMMIT_SHA=$(git rev-parse --short HEAD)
-COMMIT_SHA_FULL=$(git rev-parse HEAD)
-BRANCH=$(git branch --show-current)
-COMMIT_URL="https://$GITLAB_HOST/$PROJECT/-/commit/$COMMIT_SHA_FULL"
-glab issue note <id> -R "$PROJECT" -m "Committed [$COMMIT_SHA]($COMMIT_URL) on \`$BRANCH\`: <commit description>
-
-<note message if provided>"
-```
-
-- Link format `[$COMMIT_SHA]($COMMIT_URL)` makes the commit clickable in the issue and causes GitLab to cross-reference the commit in the issue timeline when pushed.
-- If the user supplied a note message, append it on a new line after the commit description.
-- If no message was supplied, omit the second line entirely.
-
-## Step 7: Offer Next Steps
+## Step 6: Offer Next Steps
 
 - Push: `git push`
 - Create MR: `glab mr create --fill`
