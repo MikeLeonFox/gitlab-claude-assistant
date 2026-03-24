@@ -106,7 +106,3 @@ The plugin resolves the project in this order:
 5. Asks you
 
 The GitLab hostname is resolved automatically from the same sources (plus `glab auth status`) — no manual configuration needed for self-hosted instances.
-
-## License
-
-MIT
