@@ -34,6 +34,27 @@ Confirm wording before posting if not explicit.
 glab auth status  # confirm username matches who the user expects to post as
 ```
 
+### Rule 3: Use `glab api` for ALL Notes / Comments — Never `glab issue note`
+
+`glab issue note -m "..."` breaks on backticks, em-dashes, parentheses, or newlines
+(`Accepts 1 arg(s), received 2`). Always use the API directly:
+
+```bash
+# ✅ Safe for arbitrary markdown
+glab api --method POST "projects/:id/issues/ISSUE_NUM/notes" \
+  --field "body=Your comment here."
+```
+
+### Rule 4: No `--state` flag on `glab issue list` (glab 1.92.1)
+
+`--state` does not exist. `-s` is `--sort`. Open is default; use `--closed` or `--all`.
+
+```bash
+glab issue list           # open (default)
+glab issue list --closed  # closed
+glab issue list --all     # all states
+```
+
 ---
 
 ## Authentication

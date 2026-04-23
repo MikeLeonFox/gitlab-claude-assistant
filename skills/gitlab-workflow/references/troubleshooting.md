@@ -2,6 +2,47 @@
 
 Comprehensive troubleshooting guide for common glab CLI issues and errors.
 
+## Known glab Version Quirks (glab 1.92.1)
+
+### `--state` flag does not exist on `glab issue list`
+
+**Symptom:** `unknown flag: --state` or unexpected results when filtering issues.
+
+**Root cause:** In glab 1.92.1, `-s` is `--sort`, **not** `--state`. There is no `--state` flag.
+Open is the default state. Only `--closed` and `--all` exist as state filters.
+
+```bash
+# ❌ WRONG — flag doesn't exist
+glab issue list --state=opened
+glab issue list -s opened
+
+# ✅ CORRECT
+glab issue list           # open (default)
+glab issue list --closed  # closed
+glab issue list --all     # all states
+```
+
+### `glab issue note -m "..."` breaks on complex messages
+
+**Symptom:** `Accepts 1 arg(s), received 2` when the message contains backticks,
+em-dashes, parentheses, or newlines.
+
+**Root cause:** Shell arg parsing tokenises the message string, glab sees extra
+positional arguments, and rejects the call.
+
+```bash
+# ❌ AVOID — fragile for anything beyond a plain one-liner
+glab issue note 42 -m "Fix complete — see `main.go` (line 42)"
+
+# ✅ MANDATE — use glab api for ALL notes; handles arbitrary markdown safely
+glab api --method POST "projects/:id/issues/42/notes" \
+  --field "body=Fix complete — see \`main.go\` (line 42)"
+```
+
+**Rule:** Never use `glab issue note` for notes in this project. Always use `glab api`.
+
+---
+
 ## Installation Issues
 
 ### Command Not Found

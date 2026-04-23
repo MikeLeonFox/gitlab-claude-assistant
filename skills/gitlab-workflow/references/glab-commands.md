@@ -144,16 +144,33 @@ Creates an MR directly linked to an issue. Auto-fills branch and title.
 ## Issues
 
 ### `glab issue list`
+
+> **⚠️ glab 1.92.1 state flags — `--state` does NOT exist.**
+> Open is the default. Use `--closed` or `--all` to filter by state.
+> `-s` is `--sort`, NOT `--state`. Do not reach for `--state`.
+
 ```
 Flags:
   -a, --assignee string     Filter by assignee (@me for self)
   -l, --label strings       Filter by label
   -m, --milestone string    Filter by milestone
-  -s, --state string        State: opened, closed, all (default: opened)
+      --closed              Show only closed issues
+      --all                 Show issues in all states
       --search string       Search issues
   -p, --page int            Page number
       --per-page int        Number per page (max 100)
   -R, --repo string         Target repo (owner/repo or group/sub/repo)
+```
+
+```bash
+# Open issues (default — no flag needed)
+glab issue list
+
+# Closed issues
+glab issue list --closed
+
+# All issues
+glab issue list --all
 ```
 
 ### `glab issue view <id>`
@@ -177,8 +194,25 @@ Flags:
 ```
 
 ### `glab issue note <id>`
+
+> **⚠️ UNRELIABLE for anything beyond simple one-liners.**
+> Shell arg parsing breaks when the message contains backticks, em-dashes,
+> parentheses, or newlines — glab receives extra positional args and throws
+> `Accepts 1 arg(s), received 2`.
+>
+> **Mandate: use `glab api` for ALL notes in this project.**
+
+```bash
+# ✅ CORRECT — safe for arbitrary markdown
+glab api --method POST "projects/:id/issues/ISSUE_NUM/notes" \
+  --field "body=Your comment text here — with dashes, `backticks`, (parens), whatever."
+
+# ❌ AVOID — breaks on complex messages
+glab issue note 42 -m "Message with `backticks` or em—dashes"
 ```
-Flags:
+
+```
+Flags (avoid in practice — prefer glab api above):
   -m, --message string    Comment text (required)
   -R, --repo string       Target repo
 ```
