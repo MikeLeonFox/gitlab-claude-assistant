@@ -30,7 +30,7 @@ glab mr view 123                   # View MR #123
 glab mr checkout 123               # Checkout MR branch
 glab mr approve 123                # Approve MR
 glab mr merge 123                  # Merge MR
-glab mr note 123 -m "Comment"      # Add comment
+glab mr note create 123 -m "Comment"  # Add comment
 glab mr update 123 --ready         # Remove draft status
 ```
 

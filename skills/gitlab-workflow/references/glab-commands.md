@@ -110,7 +110,7 @@ glab mr close 123
 glab mr reopen 123
 
 # Add note/comment to MR
-glab mr note 123 -m "Looks good to me"
+glab mr note create 123 -m "Looks good to me"
 
 # Update MR title
 glab mr update 123 --title "New title"
